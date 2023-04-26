@@ -1,0 +1,129 @@
+#include <micro_ros_arduino.h>
+
+#include <stdio.h>
+#include <rcl/rcl.h>
+#include <rcl/error_handling.h>
+#include <rclc/rclc.h>
+#include <rclc/executor.h>
+#include <TimeLib.h>
+#include <std_msgs/msg/int32.h>
+#include <sensor_msgs/msg/laser_scan.h>
+
+
+
+
+
+
+#if !defined(ESP32) && !defined(TARGET_PORTENTA_H7_M7) && !defined(ARDUINO_NANO_RP2040_CONNECT)
+#error This example is only avaible for Arduino Portenta, Arduino Nano RP2040 Connect and ESP32 Dev module
+#endif
+rcl_publisher_t lidar_publisher;
+rcl_publisher_t publisher;
+std_msgs__msg__Int32 msg;
+sensor_msgs__msg__LaserScan lscan;
+rosidl_runtime_c__String vv;
+builtin_interfaces__msg__Time _stamp;
+rosidl_runtime_c__String _frame_id;
+rosidl_runtime_c__float__Sequence _ranges;
+float* data;
+size_t size;
+
+rclc_support_t support;
+rcl_allocator_t allocator;
+rcl_node_t node;
+#define PI 3.1415926535897932384626433832795
+#define LED_PIN 13
+
+#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
+#define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
+float tt [5];
+const int timeout_ms = 1000;
+static int64_t time_ms;
+static time_t time_seconds;
+char time_str[25];
+const uint8_t LASER_MSG_SIZE = 120;   //or the size im testing
+
+void error_loop(){
+  while(1){
+    digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    delay(100);
+  }
+}
+
+void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
+{
+  RCLC_UNUSED(last_call_time);
+  if (timer != NULL) {
+    RCSOFTCHECK(rcl_publish(&publisher, &msg, NULL));
+    msg.data++;
+
+     lscan.header.stamp = _stamp ;
+     _frame_id.data = "laser_scan";
+     lscan.header.frame_id = _frame_id;
+     lscan.angle_min = 0;
+     lscan.angle_max = PI / 2.0;
+     lscan.angle_increment = PI / 180.0;
+     lscan.time_increment = 1.0 / 2;
+     lscan.scan_time = 1.0;
+     lscan.range_min = 0;
+     lscan.range_max = 120;
+
+      lscan.ranges.size = 0;
+      lscan.ranges.capacity = 120;
+      size_t i;
+      for (i = 0; i < 120; i++) // every datapoint is 2 bytes
+      {
+        lscan.ranges.data[i] =1.0;
+        lscan.ranges.size++;
+      }
+
+
+
+
+
+     
+    // lscan.ranges = _ranges;
+      
+    RCSOFTCHECK(rcl_publish(&lidar_publisher, &lscan, NULL));
+     
+  }
+
+   
+  
+}
+
+void setup() {
+   set_microros_wifi_transports("DEAR11_2.4GHz", "08110171188", "192.168.1.64", 8888);
+
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, HIGH);
+
+  delay(2000);
+
+  allocator = rcl_get_default_allocator();
+
+  //create init_options
+  RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+
+  // create node
+  RCCHECK(rclc_node_init_default(&node, "micro_ros_lidar_node", "", &support));
+
+  // create publisher
+  RCCHECK(rclc_publisher_init_best_effort(
+    &publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+    "topic_name"));
+  // create publisher
+  RCCHECK(rclc_publisher_init_best_effort(
+    &publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, LaserScan),
+    "scang"));
+}
+
+void loop() {
+    RCSOFTCHECK(rcl_publish(&publisher, &msg, NULL));
+    msg.data++;
+
+}
